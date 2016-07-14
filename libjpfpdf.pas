@@ -11,7 +11,7 @@ Contribution: Gilson Nunes - Use of enumerators and resolved bug related to deci
 
 Date: 08/06/2012
 
-Version: 1.33 Stable
+Version: 1.33 Stable // modded by TrustFm
 
 License: You can freely use and modify this library for commercial purposes or not,
          provided you keep the credits to the author and his contributors.
@@ -30,7 +30,8 @@ uses
   {$ENDIF}{$ENDIF}
   Classes, SysUtils, zstream, FPimage,
   FPReadPNG, FPReadBMP, FPReadGif,
-  FPWriteJPEG, FPReadJPEG, LCLProc;
+  FPWriteJPEG, FPReadJPEG, lazutf8;
+
 
 type
   TJPImageInfo = record
@@ -48,9 +49,13 @@ type
     trns: string;
   end;
 
+
+  TPDFCodePage = (CP1250,CP1251,CP1252,CP1253);
   TJPFont = record
     Name: string;
     number: integer;
+    CodePage: TPDFCodePage;
+    Encoding : string;
   end;
 
   TJPColor = (cBlack, cSilver, cGray, cWhite, cMaroon, cRed, cPurple, cFuchsia,
@@ -63,11 +68,13 @@ type
   TPDFDisplayMode = (dmFullPage, dmFullWidth, dmReal, dmDefault, dmZoom);
   TPDFContentStream = (csToViewBrowser, csToDownload);
 
+
+
   { TJPFpdf }
 
   TJPFpdf = class
   private
-    function FontWasUsed(font: string): boolean;
+    function FontWasUsed(font: string; CodePage : TPDFCodePage): boolean;
     function GetInfoImage(imgFile: string): TJPImageInfo;
     function GzCompress(StrIn: string; CompLevel: TCompressionLevel = clMax): string;
     function GzDecompress(StrIn: string): string;
@@ -78,7 +85,7 @@ type
     procedure _endpage;
     procedure _newobj;
     function _setfont(fFamily: TPDFFontFamily; fStyle: TPDFFontStyle;
-      fSize: double): boolean;
+      fSize: double; fCodePage: TPDFCodePage): boolean;
     function _setfontsize(fSize: double): boolean;
   protected
     function FloatToStr(Value: double): string;
@@ -115,6 +122,7 @@ type
     cFontStyle: TPDFFontStyle;         // current font style
     cFontSizePt: double;         // current font size in points
     cFontSize: double;           // current font size in user unit
+    cCodePage: TPDFCodePage; //current code page
     pUnderlineFlag: boolean;      // underlining flag
     pDrawColor: string;          // commands for drawing color
     pFillColor: string;          // commands for filling color
@@ -153,7 +161,7 @@ type
     procedure Error(TextMsg: string);
     procedure Open;
     procedure Close;
-    procedure AddPage(Orientation: TPDFOrientation = poDefault);
+    procedure AddPage(Orientation: TPDFOrientation = poDefault; codepage: TPDFCodePage = CP1252);
     function PageNo: integer;
     procedure SetDrawColor(ValR: integer; ValG: integer = -1; ValB: integer = -1);
     procedure SetFillColor(ValR: integer; ValG: integer = -1; ValB: integer = -1);
@@ -166,8 +174,8 @@ type
     procedure Line(vX1, vY1, vX2, vY2: double);
     procedure Rect(vX, vY, vWidht, vHeight: double; vStyle: string = '');
     procedure SetFont(fFamily: TPDFFontFamily; fStyle: TPDFFontStyle;
-      fSize: double = 0.0; fUnderline: boolean = False);
-    procedure SetFont(fFamily: TPDFFontFamily; fSize: double = 0.0;
+      fSize: double = 0.0; fCodePage: TPDFCodePage = CP1252; fUnderline: boolean = False);
+    procedure SetFont(fFamily: TPDFFontFamily; fSize: double = 0.0; fCodePage: TPDFCodePage = CP1252;
       fUnderline: boolean = False);
     procedure SetFontSize(fSize: double; fUnderline: boolean = False);
     procedure SetUnderline(fUnderline: boolean = False);
@@ -454,11 +462,12 @@ begin
   _enddoc;
 end;
 
-procedure TJPFpdf.AddPage(orientation: TPDFOrientation);
+procedure TJPFpdf.AddPage(orientation: TPDFOrientation; codepage: TPDFCodePage);
 var
   vdc, vfc, vtc: string;
   vfamily: TPDFFontFamily;
   vstyle: TPDFFontStyle;
+  vcodepage: TPDFCodePage;
   vsize: double;
   vlw: double;
   vcf: boolean;
@@ -469,6 +478,7 @@ begin
   vfamily := Self.cFontFamily;
   vstyle := Self.cFontStyle;
   vsize := Self.cFontSizePt;
+  vcodepage:=self.cCodePage;
   vlw := Self.pLineWidth;
   vdc := Self.pDrawColor;
   vfc := Self.pFillColor;
@@ -490,7 +500,7 @@ begin
   //Set line width
   _out(FloatToStr(vlw) + ' w');
   //Set font
-  SetFont(vfamily, vstyle, vsize);
+  SetFont(vfamily, vstyle, vsize, vcodepage); //commented by trustfm
   //Set colors
   if (vdc <> '0 G') then
     _out(vdc);
@@ -507,7 +517,7 @@ begin
     _out(FloatToStr(vlw) + ' w');
   end;
   //Restore font
-  SetFont(vfamily, vstyle, vsize);
+  SetFont(vfamily, vstyle, vsize,vcodepage);  //commented by trustfm
   //Restore colors
   if (Self.pDrawColor <> vdc) then
   begin
@@ -633,16 +643,16 @@ begin
 end;
 
 procedure TJPFpdf.SetFont(fFamily: TPDFFontFamily; fStyle: TPDFFontStyle;
-  fSize: double; fUnderline: boolean);
+  fSize: double; fCodePage: TPDFCodePage; fUnderline: boolean);
 begin
   //Select a font; size given in points
-  _setfont(fFamily, fStyle, fSize);
+  _setfont(fFamily, fStyle, fSize, fCodePage);
   Self.pUnderlineFlag := fUnderline;
 end;
 
-procedure TJPFpdf.SetFont(fFamily: TPDFFontFamily; fSize: double; fUnderline: boolean);
+procedure TJPFpdf.SetFont(fFamily: TPDFFontFamily; fSize: double; fCodePage: TPDFCodePage; fUnderline: boolean);
 begin
-  _setfont(fFamily, fsNormal, fSize);
+  _setfont(fFamily, fsNormal, fSize, fCodePage);
   Self.pUnderlineFlag := fUnderline;
 end;
 
@@ -662,7 +672,9 @@ procedure TJPFpdf.Text(vX, vY: double; vText: string);
 var
   sss: string;
 begin
-  if (pUTF8) then vText := UTF8ToUTF16(vText);
+  if (pUTF8) then begin
+     vText := UTF8ToUTF16(vText);
+  end;
   //Output a string
   vText := StringReplace(StringReplace(
     StringReplace(vText, '\', '\\', [rfReplaceAll]), ')', '\)', [rfReplaceAll]),
@@ -838,7 +850,9 @@ var
   vws, vx, vy, vdx: double;
   sss: string;
 begin
-  if (pUTF8) then vText := UTF8ToUTF16(vText);
+  if (pUTF8) then begin
+    vText := UTF8ToUTF16(vText);
+  end;
   //Output a cell
   if (((Self.cpY + vHeight) > Self.PageBreakTrigger) and not
     (Self.InFooter) and (AcceptPageBreak())) then
@@ -1219,7 +1233,7 @@ begin
 end;
 
 function TJPFpdf._setfont(fFamily: TPDFFontFamily; fStyle: TPDFFontStyle;
-  fSize: double): boolean;
+  fSize: double; fCodePage: TPDFCodePage): boolean;
 var
   vfontname: string;
   vn: integer;
@@ -1228,11 +1242,15 @@ begin
     fSize := Self.cFontSizePt;
   //Test if font is already selected
   if ((Self.cFontFamily = fFamily) and (Self.cFontStyle = fStyle) and
-    (Self.cFontSizePt = fSize)) then
+    (Self.cFontSizePt = fSize) and (self.cCodePage=fCodePage) ) then
   begin
     Result := True;
     Exit;
   end;
+
+  //set the current codepage
+  self.cCodePage:=fCodePage;
+
   //Retrieve Type1 font name
   if (fFamily = ffTimes) then
     if (fStyle = fsNormal) then
@@ -1243,12 +1261,13 @@ begin
   else
     vfontname := JFONTFAMILY[fFamily] + JFONTSTYLE[fStyle];
   //Test if used for the first time
-  if not (FontWasUsed(vfontname)) then
+  if not (FontWasUsed(vfontname,fCodePage)) then
   begin
     vn := Length(Self.pFonts);
     SetLength(Self.pFonts, vn + 1);
     Self.pFonts[vn].number := vn + 1;
     Self.pFonts[vn].Name := vfontname;
+    Self.pFonts[vn].CodePage:=fCodePage;
   end;
   //Select it
   Self.cFontFamily := fFamily;
@@ -1319,19 +1338,186 @@ begin
     _out('endobj');
   end;
   //Fonts
+
+  //Modded by trustfm
+  //http://www.tv.com.pl/stepbystep/pdfinclude/
+  //http://linlog.blogspot.it/2011/02/generation-of-simple-pdf-files.html
+
+  for vu := 0 to Length(Self.pFonts) - 1 do begin
+    if Self.pFonts[vu].CodePage = CP1250 then begin
+      _newobj();
+      _out('<<');
+      _out('/Type /Encoding');
+      _out('/BaseEncoding /WinAnsiEncoding');
+      _out('/Differences [');
+      _out('143 /Zacute');
+      _out('159 /zacute');
+      _out('140 /Sacute');
+      _out('156 /sacute');
+      _out('202 /Eogonek');
+      _out('234 /eogonek');
+      _out('198 /Cacute');
+      _out('230 /cacute');
+      _out('209 /Nacute');
+      _out('241 /nacute');
+      _out('211 /Oacute');
+      _out('243 /oacute');
+      _out('163 /Lslash');
+      _out('179 /lslash');
+      _out('165 /Aogonek');
+      _out('185 /aogonek');
+      _out('175 /Zdotaccent');
+      _out('191 /zdotaccent');
+      _out(']');
+      _out('>>');
+      _out('endobj');
+    end else if Self.pFonts[vu].CodePage = CP1251 then begin
+      _newobj();
+      _out('<<');
+      _out('/Type /Encoding');
+      _out('/BaseEncoding /WinAnsiEncoding');
+      _out('/Differences [');
+      _out('128 /Djecyrillic /Gjecyrillic');
+      _out('131 /afii10100');
+      _out('136 /Euro');
+      _out('138 /Ljecyrillic');
+      _out('140 /Njecyrillic /Kjecyrillic /Tshecyrillic /Dzhecyrillic /afii10099');
+      _out('154 /afii10106 ');
+      _out('156 /afii10107 /afii10109 /afii10108 /afii10193');
+      _out('161 /Ushortcyrillic /afii10110 /Jecyrillic');
+      _out('165 /Gheupturncyrillic ');
+      _out('168 /Iocyrillic');
+      _out('170 /Ecyrillic');
+      _out('175 /Yicyrillic');
+      _out('178 /Icyrillic /afii10103 /afii10098');
+      _out('184 /afii10071 /afii61352 /afii10101');
+      _out('188 /afii10105 /Dzecyrillic /afii10102 /afii10104 /Acyrillic');
+      _out(' /Becyrillic /Vecyrillic /Gecyrillic /Decyrillic /Iecyrillic');
+      _out(' /Zhecyrillic /Zecyrillic /Iicyrillic /Iishortcyrillic');
+      _out(' /Kacyrillic /Elcyrillic /Emcyrillic /Encyrillic /Ocyrillic ');
+      _out(' /Pecyrillic /Ercyrillic /Escyrillic /Tecyrillic');
+      _out(' /Ucyrillic /Efcyrillic /Khacyrillic /Tsecyrillic /Checyrillic /Shacyrillic /Shchacyrillic');
+      _out(' /Hardsigncyrillic /Yericyrillic /Softsigncyrillic /Ereversedcyrillic /IUcyrillic /IAcyrillic');
+      _out(' /acyrillic /afii10066 /afii10067 /afii10068 /afii10069 /afii10070 /afii10072 /afii10073');
+      _out(' /afii10074 /afii10075 /afii10076 /afii10077 /afii10078 /afii10079 /afii10080 /afii10081');
+      _out(' /afii10082 /afii10083 /afii10084 /afii10085 /afii10086 /afii10087 /afii10088 /afii10089');
+      _out(' /afii10090 /afii10091 /afii10092 /afii10093 /afii10094 /afii10095 /afii10096 /afii10097]');
+    end else if Self.pFonts[vu].CodePage = CP1252 then begin
+      _newobj();
+      _out('<<');
+      _out('/Type /Encoding');
+      _out('/BaseEncoding /WinAnsiEncoding');
+      _out('>>');
+      _out('endobj');
+    end else if Self.pFonts[vu].CodePage = CP1253 then begin
+      _newobj();
+      _out('<<');
+      _out('/Type /Encoding');
+      _out('/BaseEncoding /WinAnsiEncoding');
+      _out('/Differences [');
+      _out('162 /Alphatonos');
+      _out('184 /Epsilontonos');
+      _out('185 /Etatonos');
+      _out('186 /Iotatonos');
+      _out('187 /guillemotright');
+      _out('188 /Omicrontonos');
+      _out('189 /onehalf');
+      _out('190 /Upsilontonos');
+      _out('191 /Omegatonos');
+      _out('192 /iotadieresistonos');
+      _out('193 /Alpha');
+      _out('194 /Beta');
+      _out('195 /Gamma');
+      _out('196 /Delta');
+      _out('197 /Epsilon');
+      _out('198 /Zeta');
+      _out('199 /Eta');
+      _out('200 /Theta');
+      _out('201 /Iota');
+      _out('202 /Kappa');
+      _out('203 /Lambda');
+      _out('204 /Mu');
+      _out('205 /Nu');
+      _out('206 /Xi');
+      _out('207 /Omicron');
+      _out('208 /Pi');
+      _out('209 /Rho');
+      _out('211 /Sigma');
+      _out('212 /Tau');
+      _out('213 /Upsilon');
+      _out('214 /Phi');
+      _out('215 /Chi');
+      _out('216 /Psi');
+      _out('217 /Omega');
+      _out('218 /Iotadieresis');
+      _out('219 /Upsilondieresis');
+      _out('220 /alphatonos');
+      _out('221 /epsilontonos');
+      _out('222 /etatonos');
+      _out('223 /iotatonos');
+      _out('224 /upsilondieresistonos');
+      _out('225 /alpha');
+      _out('226 /beta');
+      _out('227 /gamma');
+      _out('228 /delta');
+      _out('229 /epsilon');
+      _out('230 /zeta');
+      _out('231 /eta');
+      _out('232 /theta');
+      _out('233 /iota');
+      _out('234 /kappa');
+      _out('235 /lambda');
+      _out('236 /mu');
+      _out('237 /nu');
+      _out('238 /xi');
+      _out('239 /omicron');
+      _out('240 /pi');
+      _out('241 /rho');
+      _out('242 /sigma1');
+      _out('243 /sigma');
+      _out('244 /tau');
+      _out('245 /upsilon');
+      _out('246 /phi');
+      _out('247 /chi');
+      _out('248 /psi');
+      _out('249 /omega');
+      _out('250 /Iotadieresis');
+      _out('251 /Upsilondieresis');
+      _out('252 /omicrontonos');
+      _out('253 /upsilontonos');
+      _out('254 /omegatonos');
+      _out(']');
+      _out('>>');
+      _out('endobj');
+    end;
+    Self.pFonts[vu].Encoding := inttostr(Self.numObj) + ' 0 R';
+  end;
+
   vnf := Self.numObj;
-  for vu := 0 to Length(Self.pFonts) - 1 do
-  begin
+  for vu := 0 to Length(Self.pFonts) - 1 do begin
+
+
     _newobj();
-    _out('<</Type /Font');
+    _out('<<');
+    _out('/Type /Font');
+
     _out('/Subtype /Type1');
-    _out('/BaseFont /' + Self.pFonts[vu].Name);
+    //_out('/Name /F' + inttostr(vu+1));
+    //_out('/Name /BF' + inttostr(vu+1));
+
     if ((Self.pFonts[vu].Name <> 'Symbol') and
-      (Self.pFonts[vu].Name <> 'ZapfDingbats')) then
-      _out('/Encoding /WinAnsiEncoding');
+       (Self.pFonts[vu].Name <> 'ZapfDingbats')) then
+          _out('/Encoding ' + Self.pFonts[vu].Encoding); // /WinAnsiEncoding
+
+    _out('/BaseFont /' + Self.pFonts[vu].Name);
+
+
+
     _out('>>');
     _out('endobj');
+
   end;
+
   //Images
   vni := Self.numObj;
   for vu := 0 to Length(Self.pImages) - 1 do
@@ -1647,14 +1833,14 @@ begin
     (ut / 1000 * Self.cFontSize)],TPDFFormatSetings);
 end;
 
-function TJPFpdf.FontWasUsed(font: string): boolean;
+function TJPFpdf.FontWasUsed(font: string; CodePage : TPDFCodePage): boolean;
 var
   i: integer;
 begin
   Result := False;
   for i := 0 to Length(Self.pFonts) - 1 do
   begin
-    if (Self.pFonts[i].Name = font) then
+    if ((Self.pFonts[i].Name = font) and (Self.pFonts[i].CodePage=CodePage)) then
     begin
       Result := True;
       break;
